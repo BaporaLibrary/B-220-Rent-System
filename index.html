@@ -55,7 +55,8 @@
             </tr>
         </thead>
         <tbody id="tenantBody">
-            </tbody>
+            <!-- Populated by JS -->
+        </tbody>
         <tfoot>
             <tr class="highlight-row">
                 <td colspan="5" style="text-align: right;"><strong>TOTALS:</strong></td>
@@ -74,7 +75,6 @@
     </div>
 
     <script>
-        // NEW API URL INSERTED HERE
         const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec"; 
         
         const ratePerUnit = 9;
@@ -118,7 +118,7 @@
                     }
                 }
             } catch (error) {
-                console.error("Error loading history:", error);
+                console.error("No history found or error loading.", error);
             }
             document.getElementById('loading').style.display = 'none';
             renderTable();
@@ -242,22 +242,21 @@
                 return;
             }
 
-            document.getElementById('loading').innerText = "Saving data to Google Sheet...";
+            document.getElementById('loading').innerText = "Sending data to Google Sheet...";
             document.getElementById('loading').style.display = 'block';
 
             let dataToSave = [];
 
+            // Grab all active rows WITH a new reading
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
                 const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
-                const currentName = document.getElementById(`name-${t.id}`).value;
-                const currentBaseRent = parseInt(document.getElementById(`baseRent-${t.id}`).value) || 0;
-
-                if(isActive && newReadInput) {
+                
+                if(isActive && newReadInput > 0) {
                     dataToSave.push({
                         id: t.id,
-                        name: currentName,
-                        baseRent: currentBaseRent,
+                        name: document.getElementById(`name-${t.id}`).value,
+                        baseRent: parseInt(document.getElementById(`baseRent-${t.id}`).value) || 0,
                         oldReading: t.oldReading,
                         newReading: newReadInput,
                         units: document.getElementById(`units-${t.id}`).innerText,
@@ -269,8 +268,9 @@
                 }
             });
 
+            // Grab water motor if it has a reading
             const waterNewReadInput = parseInt(document.getElementById(`newRead-water`).value);
-            if(waterNewReadInput) {
+            if(waterNewReadInput > 0) {
                 dataToSave.push({
                     id: 9,
                     name: "Water Motor",
@@ -286,25 +286,26 @@
             }
 
             if(dataToSave.length === 0) {
-                alert("No active tenants with new readings entered. Nothing to save!");
+                alert("Error: You must type a number into the 'New Reading' boxes before saving!");
                 document.getElementById('loading').style.display = 'none';
                 return;
             }
 
             try {
-                const response = await fetch(API_URL, {
+                // 'no-cors' forces the data through Google's security blocks
+                await fetch(API_URL, {
                     method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(dataToSave)
                 });
-                const result = await response.json();
                 
-                if(result.status === "success") {
-                    alert(`Successfully saved records for ${selectedMonth}!`);
-                }
+                alert(`SUCCESS: Data sent for ${selectedMonth}! Please refresh your Google Sheet.`);
             } catch (error) {
                 console.error("Save error:", error);
-                alert("Save request sent! Please check your Google Sheet to confirm the new rows appeared.");
+                alert("Network error. Could not reach Google Sheets.");
             }
+            
             document.getElementById('loading').style.display = 'none';
         }
 
