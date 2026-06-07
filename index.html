@@ -5,65 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>B 220 Rent Record - Admin Dashboard</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f9;
-        }
-        h2 {
-            text-align: center;
-            background-color: #007bff;
-            color: white;
-            padding: 15px;
-            margin-bottom: 0;
-            border-radius: 5px 5px 0 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-        }
-        th {
-            background-color: #ffeb3b; /* Yellow header from your sheet */
-            color: #333;
-            font-weight: bold;
-        }
-        input[type="number"] {
-            width: 80px;
-            padding: 5px;
-            text-align: center;
-        }
-        .highlight-row {
-            background-color: #e9ecef;
-            font-weight: bold;
-        }
-        button {
-            display: block;
-            width: 200px;
-            margin: 20px auto;
-            padding: 10px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #218838;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .header-controls { display: flex; justify-content: space-between; align-items: center; background-color: #007bff; color: white; padding: 15px; border-radius: 5px 5px 0 0; }
+        .header-controls h2 { margin: 0; }
+        .month-selector { padding: 5px; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #ffeb3b; color: #333; font-weight: bold; }
+        input[type="number"] { width: 80px; padding: 5px; text-align: center; }
+        .highlight-row { background-color: #e9ecef; font-weight: bold; }
+        .btn-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
+        button { width: 200px; padding: 10px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .btn-calc { background-color: #ffc107; color: #333; }
+        .btn-save { background-color: #28a745; color: white; }
+        button:hover { opacity: 0.8; }
+        #loading { text-align: center; color: #007bff; font-weight: bold; margin: 10px; display: none; }
     </style>
 </head>
 <body>
 
-    <h2>B 220 RENT RECORD (Admin View)</h2>
+    <div class="header-controls">
+        <h2>B 220 RENT RECORD (Admin View)</h2>
+        <div>
+            <label for="monthSelect"><strong>Billing Month: </strong></label>
+            <input type="month" id="monthSelect" class="month-selector">
+        </div>
+    </div>
     
+    <div id="loading">Connecting to Database... Please wait.</div>
+
     <table id="rentTable">
         <thead>
             <tr>
@@ -92,13 +62,21 @@
         </tfoot>
     </table>
 
-    <button onclick="calculateAll()">Calculate & Update</button>
+    <div class="btn-container">
+        <button class="btn-calc" onclick="calculateAll()">Recalculate Totals</button>
+        <button class="btn-save" onclick="saveToDatabase()">Save Month to History</button>
+    </div>
 
     <script>
-        // Initial Data (This will eventually come from your Google Sheet API)
+        // ==========================================
+        // PASTE YOUR GOOGLE WEB APP URL HERE:
+        const API_URL = "https://script.google.com/macros/s/AKfycbxgUiGuU1-oUG-nhnwla3IInu_XwSx0_RRt3E2YUnkQ2ZybJ3Ux3ecUy4uKukzG0VYm/exec"; 
+        // ==========================================
+
         const ratePerUnit = 9;
         
-        const tenants = [
+        // Base lineup (Used if there is no history yet)
+        let tenants = [
             { id: 1, name: "Mukesh", oldReading: 3161, baseRent: 2000 },
             { id: 2, name: "Ganesh Sharma", oldReading: 3293, baseRent: 2900 },
             { id: 3, name: "Sunil (Ganesh)", oldReading: 10580, baseRent: 3800 },
@@ -109,51 +87,107 @@
             { id: 8, name: "Munna Mukhiya", oldReading: 1383, baseRent: 2900 }
         ];
 
-        const waterMotor = { oldReading: 4648, newReading: 4845 }; // Example initial data
+        let waterMotor = { oldReading: 4648, newReading: 4845 };
+
+        // Set default month to current month
+        document.getElementById('monthSelect').value = new Date().toISOString().slice(0, 7);
+
+        // Fetch History on Load
+        async function loadHistory() {
+            if (API_URL === "YOUR_GOOGLE_SCRIPT_MAC_URL") {
+                alert("Please paste your Google Apps Script URL in the code!");
+                renderTable();
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            try {
+                const response = await fetch(API_URL);
+                const historyData = await response.json();
+                
+                if (historyData && historyData.length > 0) {
+                    // Update tenants with their latest readings from the database
+                    tenants.forEach(t => {
+                        // Find the most recent record for this tenant
+                        const tenantHistory = historyData.filter(row => row.id == t.id);
+                        if (tenantHistory.length > 0) {
+                            const lastRecord = tenantHistory[tenantHistory.length - 1];
+                            t.oldReading = lastRecord.newReading; // Last month's NEW is this month's OLD
+                        }
+                    });
+
+                    // Update Water Motor
+                    const waterHistory = historyData.filter(row => row.id == 9);
+                    if (waterHistory.length > 0) {
+                        const lastWater = waterHistory[waterHistory.length - 1];
+                        waterMotor.oldReading = lastWater.newReading;
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading history:", error);
+                alert("Could not load history. Using default values.");
+            }
+            document.getElementById('loading').style.display = 'none';
+            renderTable();
+        }
 
         function renderTable() {
             const tbody = document.getElementById("tenantBody");
             let html = "";
 
-            // Render Tenant Rows
             tenants.forEach((t) => {
                 html += `
                     <tr id="row-${t.id}">
                         <td>${t.id}</td>
                         <td>${t.name}</td>
-                        <td>${t.oldReading}</td>
-                        <td><input type="number" id="newRead-${t.id}" placeholder="Enter"></td>
+                        <td id="oldRead-${t.id}">${t.oldReading}</td>
+                        <td><input type="number" id="newRead-${t.id}" placeholder="Enter" class="calc-trigger"></td>
                         <td id="units-${t.id}">0</td>
                         <td id="elec-${t.id}">0</td>
                         <td id="waterShare-${t.id}">0</td>
                         <td>${t.baseRent}</td>
-                        <td id="totalRent-${t.id}" style="font-weight:bold;">0</td>
+                        <td id="totalRent-${t.id}" style="font-weight:bold; font-size:1.1em; color:#d9534f;">0</td>
                     </tr>
                 `;
             });
 
-            // Render Water Motor Row at the bottom
             html += `
                 <tr style="background-color: #d1ecf1; font-weight: bold;">
                     <td>9</td>
                     <td>Water Motor</td>
-                    <td>${waterMotor.oldReading}</td>
-                    <td><input type="number" id="newRead-water" value="${waterMotor.newReading}"></td>
+                    <td id="oldRead-water">${waterMotor.oldReading}</td>
+                    <td><input type="number" id="newRead-water" placeholder="Enter" class="calc-trigger"></td>
                     <td id="units-water">0</td>
                     <td id="elec-water">0</td>
                     <td colspan="3" style="text-align:left; font-size: 0.9em; color: #666;">
-                        *Total Motor units divide by ${tenants.length} tenants
+                        *Total Motor units divided by ${tenants.length} tenants
                     </td>
                 </tr>
             `;
 
             tbody.innerHTML = html;
+            attachEnterKeyListener(); // Attach Enter key logic
+        }
+
+        function attachEnterKeyListener() {
+            // Calculate automatically when Enter is pressed in any input box
+            const inputs = document.querySelectorAll('.calc-trigger');
+            inputs.forEach(input => {
+                input.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        calculateAll();
+                        // Move focus to the next input box automatically
+                        const nextInput = inputs[Array.from(inputs).indexOf(input) + 1];
+                        if (nextInput) nextInput.focus();
+                    }
+                });
+            });
         }
 
         function calculateAll() {
             let grandUnits = 0, grandElec = 0, grandBase = 0, grandFinal = 0;
 
-            // 1. Calculate Water Motor First (to get the split)
+            // Water Calculation
             const waterNew = parseInt(document.getElementById("newRead-water").value) || waterMotor.oldReading;
             const waterUnits = waterNew - waterMotor.oldReading;
             const sharedWaterUnitsPerTenant = waterUnits / tenants.length;
@@ -162,28 +196,25 @@
             document.getElementById("units-water").innerText = waterUnits;
             document.getElementById("elec-water").innerText = waterUnits * ratePerUnit;
 
-            // 2. Calculate Individual Tenants
+            // Tenant Calculation
             tenants.forEach(t => {
                 const newRead = parseInt(document.getElementById(`newRead-${t.id}`).value) || t.oldReading;
                 const unitsUsed = newRead - t.oldReading;
                 const elecBill = unitsUsed * ratePerUnit;
-                
                 const totalMonthly = elecBill + waterCostPerTenant + t.baseRent;
 
-                // Update DOM
                 document.getElementById(`units-${t.id}`).innerText = unitsUsed;
                 document.getElementById(`elec-${t.id}`).innerText = elecBill;
                 document.getElementById(`waterShare-${t.id}`).innerText = waterCostPerTenant;
                 document.getElementById(`totalRent-${t.id}`).innerText = totalMonthly;
 
-                // Add to Grand Totals
                 grandUnits += unitsUsed;
                 grandElec += elecBill;
                 grandBase += t.baseRent;
                 grandFinal += totalMonthly;
             });
 
-            // Update Footer Totals
+            // Grand Totals
             document.getElementById("grandTotalUnits").innerText = grandUnits + waterUnits;
             document.getElementById("grandTotalElec").innerText = grandElec + (waterUnits * ratePerUnit);
             document.getElementById("grandTotalWater").innerText = (waterCostPerTenant * tenants.length);
@@ -191,8 +222,83 @@
             document.getElementById("grandTotalFinal").innerText = grandFinal;
         }
 
-        // Initialize table on load
-        window.onload = renderTable;
+        async function saveToDatabase() {
+            // First, force a calculation to ensure all numbers are accurate
+            calculateAll();
+            
+            const selectedMonth = document.getElementById("monthSelect").value;
+            if (!selectedMonth) {
+                alert("Please select a billing month at the top!");
+                return;
+            }
+
+            document.getElementById('loading').innerText = "Saving data to Google Sheet...";
+            document.getElementById('loading').style.display = 'block';
+
+            let dataToSave = [];
+
+            // Package Tenant Data
+            tenants.forEach(t => {
+                const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
+                if(newReadInput) {
+                    dataToSave.push({
+                        id: t.id,
+                        name: t.name,
+                        baseRent: t.baseRent,
+                        oldReading: t.oldReading,
+                        newReading: newReadInput,
+                        units: document.getElementById(`units-${t.id}`).innerText,
+                        elecBill: document.getElementById(`elec-${t.id}`).innerText,
+                        waterShare: document.getElementById(`waterShare-${t.id}`).innerText,
+                        totalRent: document.getElementById(`totalRent-${t.id}`).innerText,
+                        month: selectedMonth
+                    });
+                }
+            });
+
+            // Package Water Motor Data
+            const waterNewReadInput = parseInt(document.getElementById(`newRead-water`).value);
+            if(waterNewReadInput) {
+                dataToSave.push({
+                    id: 9,
+                    name: "Water Motor",
+                    baseRent: 0,
+                    oldReading: waterMotor.oldReading,
+                    newReading: waterNewReadInput,
+                    units: document.getElementById(`units-water`).innerText,
+                    elecBill: document.getElementById(`elec-water`).innerText,
+                    waterShare: 0,
+                    totalRent: document.getElementById(`elec-water`).innerText,
+                    month: selectedMonth
+                });
+            }
+
+            if(dataToSave.length === 0) {
+                alert("No new readings entered. Nothing to save!");
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(dataToSave)
+                });
+                const result = await response.json();
+                
+                if(result.status === "success") {
+                    alert(`Successfully saved records for ${selectedMonth}!`);
+                }
+            } catch (error) {
+                console.error("Save error:", error);
+                // Due to how Google Apps script CORS works, it sometimes throws an opaque error even when successful.
+                alert("Save request sent! Please check your Google Sheet to confirm the new rows appeared.");
+            }
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Initialize on load
+        window.onload = loadHistory;
     </script>
 </body>
 </html>
