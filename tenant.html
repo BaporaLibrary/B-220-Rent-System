@@ -23,7 +23,9 @@
         .receipt-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 15px; color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .receipt-row.sub-row { font-size: 13px; color: #888; border: none; margin-top: -8px; padding-bottom: 10px; }
         
-        .total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px solid #333; font-size: 20px; font-weight: bold; color: #d9534f; }
+        .total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px solid #333; font-size: 18px; font-weight: bold; color: #d9534f; }
+        .paid-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 18px; font-weight: bold; color: #28a745; }
+        .balance-row { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 15px; border-top: 2px dashed #333; font-size: 22px; font-weight: bold; color: #0056b3; background-color: #f8f9fa; padding: 10px; border-radius: 5px; }
         
         .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
     </style>
@@ -85,9 +87,20 @@
             <span style="font-weight: bold; color:#d39e00;">₹<span id="r-prev">0</span></span>
         </div>
 
+        <!-- NEW TOTALS SECTION -->
         <div class="total-row">
             <span>TOTAL DUE:</span>
             <span>₹<span id="r-total">0</span></span>
+        </div>
+        
+        <div class="paid-row">
+            <span>AMOUNT PAID:</span>
+            <span>- ₹<span id="r-paid">0</span></span>
+        </div>
+
+        <div class="balance-row">
+            <span>REMAINING BALANCE:</span>
+            <span>₹<span id="r-newbal">0</span></span>
         </div>
     </div>
 
@@ -100,7 +113,6 @@
         const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec";
         let fullDatabase = [];
 
-        // Pre-load the database so switching tenants is instant
         async function init() {
             try {
                 const response = await fetch(API_URL);
@@ -123,7 +135,6 @@
             receiptCard.style.display = "none";
             loading.style.display = "block";
 
-            // If database hasn't loaded yet, fetch it now
             if (fullDatabase.length === 0) {
                 try {
                     const response = await fetch(API_URL);
@@ -134,7 +145,6 @@
                 }
             }
 
-            // Filter for the selected tenant and get their most recent record
             const tenantRecords = fullDatabase.filter(row => row.id == selectedId);
             
             if (tenantRecords.length === 0) {
@@ -142,10 +152,8 @@
                 return;
             }
 
-            // The last record in the array is the most recent one pushed to the sheet
             const latestBill = tenantRecords[tenantRecords.length - 1];
 
-            // Populate the digital receipt
             document.getElementById("r-name").innerText = latestBill.name;
             document.getElementById("r-month").innerText = "Month: " + latestBill.month;
             
@@ -158,15 +166,17 @@
             document.getElementById("r-extra").innerText = latestBill.extraCharges || 0;
             document.getElementById("r-prev").innerText = latestBill.prevPending || 0;
 
-            // Calculate exact total due (Total Rent + Prev Pending)
             const totalDue = (Number(latestBill.totalRent) || 0) + (Number(latestBill.prevPending) || 0);
             document.getElementById("r-total").innerText = totalDue;
+            
+            // Inject Paid and Remaining Balance
+            document.getElementById("r-paid").innerText = latestBill.amountPaid || 0;
+            document.getElementById("r-newbal").innerText = latestBill.newPending || 0;
 
             loading.style.display = "none";
             receiptCard.style.display = "block";
         }
 
-        // Start loading data in the background as soon as the page opens
         window.onload = init;
     </script>
 </body>
