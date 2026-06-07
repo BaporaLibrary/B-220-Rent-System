@@ -10,15 +10,15 @@
         .header-controls h2 { margin: 0; }
         .month-selector { padding: 5px; font-size: 16px; }
         table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 14px; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 4px; text-align: center; }
         th { background-color: #ffeb3b; color: #333; font-weight: bold; }
         input[type="number"], input[type="text"] { padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
-        .read-input { width: 60px; }
-        .name-input { width: 110px; }
+        .read-input { width: 55px; }
+        .name-input { width: 100px; }
         .rent-input { width: 60px; font-weight: bold;}
         .highlight-row { background-color: #e9ecef; font-weight: bold; }
         .inactive-row { opacity: 0.4; background-color: #f8f9fa; }
-        .balance-col { background-color: #fff3cd; } /* Highlight for money columns */
+        .balance-col { background-color: #fff3cd; } 
         
         .btn-container { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
         button { padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
@@ -32,7 +32,7 @@
 
         /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fff; margin: 2% auto; padding: 20px; border-radius: 8px; width: 95%; max-width: 1200px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-content { background-color: #fff; margin: 2% auto; padding: 20px; border-radius: 8px; width: 98%; max-width: 1300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close-btn:hover { color: black; }
         .history-controls { margin-bottom: 15px; text-align: center; display: flex; justify-content: center; gap: 20px; align-items: center;}
@@ -65,6 +65,7 @@
                 <th>Elec</th>
                 <th>Water</th>
                 <th>Base Rent</th>
+                <th class="balance-col" style="color:#fd7e14;">Extra</th>
                 <th class="balance-col">Prev Bal</th>
                 <th class="balance-col" style="color:red;">Total Due</th>
                 <th class="balance-col" style="color:green;">Paid</th>
@@ -72,7 +73,8 @@
             </tr>
         </thead>
         <tbody id="tenantBody">
-            </tbody>
+            <!-- Populated by JS -->
+        </tbody>
         <tfoot>
             <tr class="highlight-row">
                 <td colspan="5" style="text-align: right;"><strong>TOTALS:</strong></td>
@@ -80,6 +82,7 @@
                 <td id="grandTotalElec">0</td>
                 <td id="grandTotalWater">0</td>
                 <td id="grandTotalBase">0</td>
+                <td id="grandTotalExtra" class="balance-col" style="color:#fd7e14;">0</td>
                 <td id="grandPrevBal" class="balance-col">0</td>
                 <td id="grandTotalDue" class="balance-col" style="color:red;">0</td>
                 <td id="grandTotalPaid" class="balance-col" style="color:green;">0</td>
@@ -94,6 +97,7 @@
         <button class="btn-history" onclick="openHistoryModal()">View Tenant History</button>
     </div>
 
+    <!-- HISTORY POP-UP MODAL -->
     <div id="historyModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
@@ -109,7 +113,7 @@
                 <div>
                     <label for="historyMonthFilter"><strong>Search Month: </strong></label>
                     <input type="month" id="historyMonthFilter" onchange="renderHistoryTable()">
-                    <button onclick="clearMonthFilter()" style="padding: 6px 10px; font-size: 14px; width: auto; background-color: #6c757d; margin-left: 5px;">Clear</button>
+                    <button onclick="clearMonthFilter()" style="padding: 6px 10px; font-size: 14px; width: auto; background-color: #6c757d; margin-left: 5px; color:white; border:none; border-radius:3px;">Clear</button>
                 </div>
             </div>
 
@@ -124,6 +128,7 @@
                             <th>Elec</th>
                             <th>Water</th>
                             <th>Base Rent</th>
+                            <th style="background-color:#fd7e14;">Extra</th>
                             <th style="background-color:#d39e00;">Prev Bal</th>
                             <th style="background-color:#c82333;">Total Due</th>
                             <th style="background-color:#218838;">Paid</th>
@@ -131,7 +136,7 @@
                         </tr>
                     </thead>
                     <tbody id="historyBody">
-                        <tr><td colspan="11">Select a tenant to view history.</td></tr>
+                        <tr><td colspan="12">Select a tenant to view history.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -174,7 +179,6 @@
                             t.oldReading = lastRecord.newReading; 
                             t.name = lastRecord.name; 
                             t.baseRent = lastRecord.baseRent; 
-                            // PULL THE LEFTOVER BALANCE FROM LAST MONTH!
                             t.prevPending = lastRecord.newPending || 0; 
                         }
                     });
@@ -210,6 +214,7 @@
                         <td id="waterShare-${t.id}">0</td>
                         <td><input type="number" id="baseRent-${t.id}" value="${t.baseRent}" class="rent-input calc-trigger"></td>
                         
+                        <td class="balance-col"><input type="number" id="extra-${t.id}" placeholder="0" class="rent-input calc-trigger" style="border-color:#fd7e14;"></td>
                         <td class="balance-col" id="prevBal-${t.id}" style="font-weight:bold;">${t.prevPending}</td>
                         <td class="balance-col" id="totalDue-${t.id}" style="font-weight:bold; color:red; font-size:1.1em;">0</td>
                         <td class="balance-col"><input type="number" id="paid-${t.id}" placeholder="Paid?" class="rent-input calc-trigger" style="border-color:green;"></td>
@@ -227,7 +232,7 @@
                     <td><input type="number" id="newRead-water" placeholder="Enter" class="read-input calc-trigger"></td>
                     <td id="units-water">0</td>
                     <td id="elec-water">0</td>
-                    <td colspan="6" id="water-split-text" style="text-align:left; font-size: 0.9em; color: #666;">
+                    <td colspan="7" id="water-split-text" style="text-align:left; font-size: 0.9em; color: #666;">
                         *Total Motor units divided by ${tenants.length} tenants
                     </td>
                 </tr>
@@ -251,7 +256,7 @@
         }
 
         function calculateAll() {
-            let grandUnits = 0, grandElec = 0, grandBase = 0;
+            let grandUnits = 0, grandElec = 0, grandBase = 0, grandExtra = 0;
             let grandPrev = 0, grandDue = 0, grandPaid = 0, grandNewBal = 0;
             let activeCount = 0;
 
@@ -281,9 +286,9 @@
                     const unitsUsed = newRead - t.oldReading;
                     const elecBill = unitsUsed * ratePerUnit;
                     const currentBaseRent = parseInt(document.getElementById(`baseRent-${t.id}`).value) || 0;
+                    const extraCharges = parseInt(document.getElementById(`extra-${t.id}`).value) || 0;
                     
-                    // NEW MATH LOGIC
-                    const thisMonthRent = elecBill + waterCostPerTenant + currentBaseRent;
+                    const thisMonthRent = elecBill + waterCostPerTenant + currentBaseRent + extraCharges;
                     const totalDue = thisMonthRent + t.prevPending;
                     const amountPaid = parseInt(document.getElementById(`paid-${t.id}`).value) || 0;
                     const newBalance = totalDue - amountPaid;
@@ -298,6 +303,7 @@
                     grandUnits += unitsUsed;
                     grandElec += elecBill;
                     grandBase += currentBaseRent;
+                    grandExtra += extraCharges;
                     grandPrev += t.prevPending;
                     grandDue += totalDue;
                     grandPaid += amountPaid;
@@ -316,6 +322,7 @@
             document.getElementById("grandTotalWater").innerText = (waterCostPerTenant * activeCount);
             document.getElementById("grandTotalBase").innerText = grandBase;
             
+            document.getElementById("grandTotalExtra").innerText = grandExtra;
             document.getElementById("grandPrevBal").innerText = grandPrev;
             document.getElementById("grandTotalDue").innerText = grandDue;
             document.getElementById("grandTotalPaid").innerText = grandPaid;
@@ -340,12 +347,12 @@
                 const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
                 
                 if(isActive && newReadInput > 0) {
-                    // Calculate internal total for saving
                     const unitsUsed = newReadInput - t.oldReading;
                     const elecBill = unitsUsed * ratePerUnit;
                     const waterShare = parseInt(document.getElementById(`waterShare-${t.id}`).innerText) || 0;
                     const baseRent = parseInt(document.getElementById(`baseRent-${t.id}`).value) || 0;
-                    const thisMonthRent = elecBill + waterShare + baseRent;
+                    const extraCharges = parseInt(document.getElementById(`extra-${t.id}`).value) || 0;
+                    const thisMonthRent = elecBill + waterShare + baseRent + extraCharges;
 
                     dataToSave.push({
                         id: t.id,
@@ -356,9 +363,10 @@
                         units: unitsUsed,
                         elecBill: elecBill,
                         waterShare: waterShare,
-                        totalRent: thisMonthRent, // Just this month's generated bill
+                        totalRent: thisMonthRent, 
                         month: selectedMonth,
                         prevPending: t.prevPending,
+                        extraCharges: extraCharges,
                         amountPaid: parseInt(document.getElementById(`paid-${t.id}`).value) || 0,
                         newPending: parseInt(document.getElementById(`newBal-${t.id}`).innerText) || 0
                     });
@@ -371,7 +379,7 @@
                     id: 9, name: "Water Motor", baseRent: 0, oldReading: waterMotor.oldReading, newReading: waterNewReadInput,
                     units: document.getElementById(`units-water`).innerText, elecBill: document.getElementById(`elec-water`).innerText,
                     waterShare: 0, totalRent: document.getElementById(`elec-water`).innerText, month: selectedMonth,
-                    prevPending: 0, amountPaid: 0, newPending: 0
+                    prevPending: 0, extraCharges: 0, amountPaid: 0, newPending: 0
                 });
             }
 
@@ -408,7 +416,7 @@
         function openHistoryModal() {
             document.getElementById("historyModal").style.display = "block";
             if(fullDatabaseHistory.length === 0) {
-                document.getElementById("historyBody").innerHTML = `<tr><td colspan="11">No history found in database yet. Save a month first!</td></tr>`;
+                document.getElementById("historyBody").innerHTML = `<tr><td colspan="12">No history found in database yet. Save a month first!</td></tr>`;
             }
         }
 
@@ -422,7 +430,7 @@
             tbody.innerHTML = "";
 
             if (!selectedId) {
-                tbody.innerHTML = `<tr><td colspan="11">Select a tenant to view history.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12">Select a tenant to view history.</td></tr>`;
                 return;
             }
 
@@ -430,7 +438,7 @@
             if (searchMonth) tenantRecords = tenantRecords.filter(row => row.month === searchMonth);
 
             if (tenantRecords.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" style="color:red;">No historical data found for this selection.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12" style="color:red;">No historical data found for this selection.</td></tr>`;
                 return;
             }
 
@@ -445,6 +453,7 @@
                         <td>₹${record.elecBill || 0}</td>
                         <td>₹${record.waterShare || 0}</td>
                         <td>₹${record.baseRent || 0}</td>
+                        <td style="font-weight:bold; color:#fd7e14;">₹${record.extraCharges || 0}</td>
                         <td style="font-weight:bold; color:#d39e00;">₹${record.prevPending || 0}</td>
                         <td style="font-weight:bold; color:#c82333;">₹${totalDueCalc}</td>
                         <td style="font-weight:bold; color:#218838;">₹${record.amountPaid || 0}</td>
