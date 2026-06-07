@@ -18,13 +18,26 @@
         .rent-input { width: 60px; }
         .highlight-row { background-color: #e9ecef; font-weight: bold; }
         .inactive-row { opacity: 0.4; background-color: #f8f9fa; }
-        .btn-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
-        button { width: 200px; padding: 10px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        
+        .btn-container { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
         .btn-calc { background-color: #ffc107; color: #333; }
         .btn-save { background-color: #28a745; color: white; }
+        .btn-history { background-color: #17a2b8; color: white; }
         button:hover { opacity: 0.8; }
+        
         #loading { text-align: center; color: #007bff; font-weight: bold; margin: 10px; display: none; }
         input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
+
+        /* Modal (Pop-up Box) Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-btn:hover { color: black; }
+        .history-controls { margin-bottom: 15px; text-align: center; }
+        .history-controls select { padding: 8px; font-size: 16px; border-radius: 4px; }
+        .history-table-container { max-height: 400px; overflow-y: auto; }
+        #historyTable th { background-color: #17a2b8; color: white; position: sticky; top: 0; }
     </style>
 </head>
 <body>
@@ -72,11 +85,47 @@
     <div class="btn-container">
         <button class="btn-calc" onclick="calculateAll()">Recalculate Totals</button>
         <button class="btn-save" onclick="saveToDatabase()">Save Month to History</button>
+        <button class="btn-history" onclick="openHistoryModal()">View Tenant History</button>
+    </div>
+
+    <!-- HISTORY POP-UP MODAL -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
+            <h2 style="text-align: center; color: #17a2b8; margin-top:0;">Tenant History Record</h2>
+            
+            <div class="history-controls">
+                <label for="historyTenantSelect"><strong>Select Tenant: </strong></label>
+                <select id="historyTenantSelect" onchange="renderHistoryTable()">
+                    <option value="">-- Choose Tenant --</option>
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
+            <div class="history-table-container">
+                <table id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Old Reading</th>
+                            <th>New Reading</th>
+                            <th>Units Used</th>
+                            <th>Electricity (Rs)</th>
+                            <th>Water Share (Rs)</th>
+                            <th>Base Rent (Rs)</th>
+                            <th>Total Paid (Rs)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr><td colspan="8">Select a tenant to view history.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec"; 
-        
         const ratePerUnit = 9;
         
         let tenants = [
@@ -91,6 +140,7 @@
         ];
 
         let waterMotor = { oldReading: 4648, newReading: 4845 };
+        let fullDatabaseHistory = []; // Stores the downloaded Google Sheet data
 
         document.getElementById('monthSelect').value = new Date().toISOString().slice(0, 7);
 
@@ -101,6 +151,8 @@
                 const historyData = await response.json();
                 
                 if (historyData && historyData.length > 0) {
+                    fullDatabaseHistory = historyData; // Save for the pop-up box
+                    
                     tenants.forEach(t => {
                         const tenantHistory = historyData.filter(row => row.id == t.id);
                         if (tenantHistory.length > 0) {
@@ -122,6 +174,7 @@
             }
             document.getElementById('loading').style.display = 'none';
             renderTable();
+            populateHistoryDropdown();
         }
 
         function renderTable() {
@@ -235,7 +288,6 @@
 
         async function saveToDatabase() {
             calculateAll();
-            
             const selectedMonth = document.getElementById("monthSelect").value;
             if (!selectedMonth) {
                 alert("Please select a billing month at the top!");
@@ -247,7 +299,6 @@
 
             let dataToSave = [];
 
-            // Grab all active rows WITH a new reading
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
                 const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
@@ -268,7 +319,6 @@
                 }
             });
 
-            // Grab water motor if it has a reading
             const waterNewReadInput = parseInt(document.getElementById(`newRead-water`).value);
             if(waterNewReadInput > 0) {
                 dataToSave.push({
@@ -292,21 +342,77 @@
             }
 
             try {
-                // 'no-cors' forces the data through Google's security blocks
                 await fetch(API_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(dataToSave)
                 });
-                
                 alert(`SUCCESS: Data sent for ${selectedMonth}! Please refresh your Google Sheet.`);
             } catch (error) {
                 console.error("Save error:", error);
                 alert("Network error. Could not reach Google Sheets.");
             }
-            
             document.getElementById('loading').style.display = 'none';
+        }
+
+        // --- HISTORY POP-UP LOGIC ---
+        function populateHistoryDropdown() {
+            const select = document.getElementById("historyTenantSelect");
+            select.innerHTML = '<option value="">-- Choose Tenant --</option>';
+            
+            // Add all current tenants to dropdown
+            tenants.forEach(t => {
+                select.innerHTML += `<option value="${t.id}">${t.name} (Room ${t.id})</option>`;
+            });
+            // Add water motor to dropdown
+            select.innerHTML += `<option value="9">Water Motor Record</option>`;
+        }
+
+        function openHistoryModal() {
+            document.getElementById("historyModal").style.display = "block";
+            if(fullDatabaseHistory.length === 0) {
+                document.getElementById("historyBody").innerHTML = `<tr><td colspan="8">No history found in database yet. Save a month first!</td></tr>`;
+            }
+        }
+
+        function closeHistoryModal() {
+            document.getElementById("historyModal").style.display = "none";
+        }
+
+        function renderHistoryTable() {
+            const selectedId = document.getElementById("historyTenantSelect").value;
+            const tbody = document.getElementById("historyBody");
+            tbody.innerHTML = "";
+
+            if (!selectedId) {
+                tbody.innerHTML = `<tr><td colspan="8">Select a tenant to view history.</td></tr>`;
+                return;
+            }
+
+            // Filter the database for ONLY this specific tenant
+            const tenantRecords = fullDatabaseHistory.filter(row => row.id == selectedId);
+
+            if (tenantRecords.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="color:red;">No historical data found for this tenant.</td></tr>`;
+                return;
+            }
+
+            // Sort by month (newest to oldest is usually best for history)
+            tenantRecords.reverse().forEach(record => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-weight:bold;">${record.month || "Unknown"}</td>
+                        <td>${record.oldReading || 0}</td>
+                        <td>${record.newReading || 0}</td>
+                        <td>${record.units || 0}</td>
+                        <td>₹${record.elecBill || 0}</td>
+                        <td>₹${record.waterShare || 0}</td>
+                        <td>₹${record.baseRent || 0}</td>
+                        <td style="font-weight:bold; color:#17a2b8;">₹${record.totalRent || 0}</td>
+                    </tr>
+                `;
+            });
         }
 
         window.onload = loadHistory;
