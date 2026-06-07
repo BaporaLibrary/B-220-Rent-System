@@ -55,8 +55,7 @@
             </tr>
         </thead>
         <tbody id="tenantBody">
-            <!-- Populated by JS -->
-        </tbody>
+            </tbody>
         <tfoot>
             <tr class="highlight-row">
                 <td colspan="5" style="text-align: right;"><strong>TOTALS:</strong></td>
@@ -75,7 +74,9 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxgUiGuU1-oUG-nhnwla3IInu_XwSx0_RRt3E2YUnkQ2ZybJ3Ux3ecUy4uKukzG0VYm/exec"; 
+        // NEW API URL INSERTED HERE
+        const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec"; 
+        
         const ratePerUnit = 9;
         
         let tenants = [
@@ -105,8 +106,8 @@
                         if (tenantHistory.length > 0) {
                             const lastRecord = tenantHistory[tenantHistory.length - 1];
                             t.oldReading = lastRecord.newReading; 
-                            t.name = lastRecord.name; // Keep updated names
-                            t.baseRent = lastRecord.baseRent; // Keep updated rent
+                            t.name = lastRecord.name; 
+                            t.baseRent = lastRecord.baseRent; 
                         }
                     });
 
@@ -180,7 +181,6 @@
             let grandUnits = 0, grandElec = 0, grandBase = 0, grandFinal = 0;
             let activeCount = 0;
 
-            // 1. Count Active Tenants
             tenants.forEach(t => {
                 if (document.getElementById(`active-${t.id}`).checked) {
                     activeCount++;
@@ -190,7 +190,6 @@
                 }
             });
 
-            // 2. Water Calculation
             const waterNew = parseInt(document.getElementById("newRead-water").value) || waterMotor.oldReading;
             const waterUnits = waterNew - waterMotor.oldReading;
             const sharedWaterUnitsPerTenant = activeCount > 0 ? (waterUnits / activeCount) : 0;
@@ -200,7 +199,6 @@
             document.getElementById("elec-water").innerText = waterUnits * ratePerUnit;
             document.getElementById("water-split-text").innerText = `*Total Motor units divided by ${activeCount} active tenants`;
 
-            // 3. Tenant Calculation
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
                 
@@ -221,7 +219,6 @@
                     grandBase += currentBaseRent;
                     grandFinal += totalMonthly;
                 } else {
-                    // Zero out inactive rows
                     document.getElementById(`units-${t.id}`).innerText = 0;
                     document.getElementById(`elec-${t.id}`).innerText = 0;
                     document.getElementById(`waterShare-${t.id}`).innerText = 0;
@@ -229,7 +226,6 @@
                 }
             });
 
-            // 4. Grand Totals Update
             document.getElementById("grandTotalUnits").innerText = grandUnits + waterUnits;
             document.getElementById("grandTotalElec").innerText = grandElec + (waterUnits * ratePerUnit);
             document.getElementById("grandTotalWater").innerText = (waterCostPerTenant * activeCount);
@@ -251,7 +247,6 @@
 
             let dataToSave = [];
 
-            // Package Active Tenant Data
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
                 const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
@@ -274,7 +269,6 @@
                 }
             });
 
-            // Package Water Motor Data
             const waterNewReadInput = parseInt(document.getElementById(`newRead-water`).value);
             if(waterNewReadInput) {
                 dataToSave.push({
