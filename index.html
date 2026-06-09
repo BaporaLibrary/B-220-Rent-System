@@ -6,7 +6,7 @@
     <title>B 220 Rent Record - Admin Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        .header-controls { display: flex; justify-content: space-between; align-items: center; background-color: #007bff; color: white; padding: 15px; border-radius: 5px 5px 0 0; }
+        .header-controls { display: flex; justify-content: space-between; align-items: center; background-color: #007bff; color: white; padding: 15px; border-radius: 5px 5px 0 0; flex-wrap: wrap; gap: 10px;}
         .header-controls h2 { margin: 0; }
         .month-selector { padding: 5px; font-size: 16px; }
         table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 14px; }
@@ -21,10 +21,15 @@
         .balance-col { background-color: #fff3cd; } 
         
         .btn-container { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
-        button { padding: 10px 20px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; font-size: 15px; cursor: pointer; font-weight: bold; }
         .btn-calc { background-color: #ffc107; color: #333; }
         .btn-save { background-color: #28a745; color: white; }
         .btn-history { background-color: #17a2b8; color: white; }
+        .btn-add { background-color: #6c757d; color: white; }
+        
+        .action-btns { display: flex; gap: 5px; justify-content: center; }
+        .btn-wa { background-color: #25D366; color: white; padding: 5px 8px; font-size: 12px; border-radius: 3px; border: none; cursor: pointer; }
+        .btn-del { background-color: #dc3545; color: white; padding: 5px 8px; font-size: 12px; border-radius: 3px; border: none; cursor: pointer; }
         button:hover { opacity: 0.8; }
         
         #loading { text-align: center; color: #007bff; font-weight: bold; margin: 10px; display: none; }
@@ -70,6 +75,7 @@
                 <th class="balance-col" style="color:red;">Total Due</th>
                 <th class="balance-col" style="color:green;">Paid</th>
                 <th class="balance-col" style="color:blue;">New Bal</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="tenantBody">
@@ -87,11 +93,13 @@
                 <td id="grandTotalDue" class="balance-col" style="color:red;">0</td>
                 <td id="grandTotalPaid" class="balance-col" style="color:green;">0</td>
                 <td id="grandNewBal" class="balance-col" style="color:blue;">0</td>
+                <td>-</td>
             </tr>
         </tfoot>
     </table>
 
     <div class="btn-container">
+        <button class="btn-add" onclick="addNewTenant()">➕ Add New Tenant</button>
         <button class="btn-calc" onclick="calculateAll()">Recalculate Totals</button>
         <button class="btn-save" onclick="saveToDatabase()">Save Month to History</button>
         <button class="btn-history" onclick="openHistoryModal()">View Tenant History</button>
@@ -144,10 +152,10 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxkyIeQ7FRtGHtpZK0JmRDT4XypK0HY6dMRF9TojHwqymp-xzbRvz9gXJxAUBdPvd1K/exec"; 
+        const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec"; 
         const ratePerUnit = 9;
         
-        let tenants = [
+        const defaultTenants = [
             { id: 1, name: "Mukesh", oldReading: 3161, baseRent: 2000, prevPending: 0 },
             { id: 2, name: "Ganesh Sharma", oldReading: 3293, baseRent: 2900, prevPending: 0 },
             { id: 3, name: "Sunil (Ganesh)", oldReading: 10580, baseRent: 3800, prevPending: 0 },
@@ -158,10 +166,17 @@
             { id: 8, name: "Munna Mukhiya", oldReading: 1383, baseRent: 2900, prevPending: 0 }
         ];
 
+        // LOAD FROM LOCAL MEMORY (OR USE DEFAULTS IF FIRST TIME)
+        let tenants = JSON.parse(localStorage.getItem('b220_tenants_list')) || defaultTenants;
+
         let waterMotor = { oldReading: 4648, newReading: 4845 };
         let fullDatabaseHistory = []; 
 
         document.getElementById('monthSelect').value = new Date().toISOString().slice(0, 7);
+
+        function saveMemory() {
+            localStorage.setItem('b220_tenants_list', JSON.stringify(tenants));
+        }
 
         async function loadHistory() {
             document.getElementById('loading').style.display = 'block';
@@ -182,8 +197,9 @@
                             t.prevPending = lastRecord.newPending || 0; 
                         }
                     });
+                    saveMemory(); // Update memory with fresh names/rents
 
-                    const waterHistory = historyData.filter(row => row.id == 9);
+                    const waterHistory = historyData.filter(row => row.id == 9); // Motor is always ID 9
                     if (waterHistory.length > 0) {
                         const lastWater = waterHistory[waterHistory.length - 1];
                         waterMotor.oldReading = lastWater.newReading;
@@ -197,6 +213,42 @@
             populateHistoryDropdown();
         }
 
+        // --- DYNAMIC TENANT FUNCTIONS ---
+        function addNewTenant() {
+            const newName = prompt("Enter the new tenant's name (e.g. Room 9 - Rahul):");
+            if (!newName) return;
+            const newRent = parseInt(prompt("Enter their Base Rent amount:")) || 0;
+            
+            // Find highest ID to create a new one. (Skip 9 to protect water motor)
+            let maxId = tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) : 0;
+            let nextId = maxId + 1;
+            if (nextId === 9) nextId = 10; 
+
+            tenants.push({ id: nextId, name: newName, oldReading: 0, baseRent: newRent, prevPending: 0 });
+            saveMemory();
+            renderTable();
+            populateHistoryDropdown();
+        }
+
+        function deleteTenant(id) {
+            if(confirm("Are you sure you want to remove this tenant from the dashboard? (Their past history will still remain safely in the database).")) {
+                tenants = tenants.filter(t => t.id !== id);
+                saveMemory();
+                renderTable();
+                calculateAll();
+                populateHistoryDropdown();
+            }
+        }
+
+        function updateLocalData(id) {
+            const t = tenants.find(t => t.id === id);
+            if(t) {
+                t.name = document.getElementById(`name-${id}`).value;
+                t.baseRent = parseInt(document.getElementById(`baseRent-${id}`).value) || 0;
+                saveMemory();
+            }
+        }
+
         function renderTable() {
             const tbody = document.getElementById("tenantBody");
             let html = "";
@@ -206,19 +258,24 @@
                     <tr id="row-${t.id}">
                         <td><input type="checkbox" id="active-${t.id}" checked onchange="calculateAll()"></td>
                         <td>${t.id}</td>
-                        <td><input type="text" id="name-${t.id}" value="${t.name}" class="name-input"></td>
+                        <td><input type="text" id="name-${t.id}" value="${t.name}" class="name-input" onchange="updateLocalData(${t.id})"></td>
                         <td id="oldRead-${t.id}">${t.oldReading}</td>
                         <td><input type="number" id="newRead-${t.id}" placeholder="Enter" class="read-input calc-trigger"></td>
                         <td id="units-${t.id}">0</td>
                         <td id="elec-${t.id}">0</td>
                         <td id="waterShare-${t.id}">0</td>
-                        <td><input type="number" id="baseRent-${t.id}" value="${t.baseRent}" class="rent-input calc-trigger"></td>
+                        <td><input type="number" id="baseRent-${t.id}" value="${t.baseRent}" class="rent-input calc-trigger" onchange="updateLocalData(${t.id})"></td>
                         
                         <td class="balance-col"><input type="number" id="extra-${t.id}" placeholder="0" class="rent-input calc-trigger" style="border-color:#fd7e14;"></td>
                         <td class="balance-col" id="prevBal-${t.id}" style="font-weight:bold;">${t.prevPending}</td>
                         <td class="balance-col" id="totalDue-${t.id}" style="font-weight:bold; color:red; font-size:1.1em;">0</td>
                         <td class="balance-col"><input type="number" id="paid-${t.id}" placeholder="Paid?" class="rent-input calc-trigger" style="border-color:green;"></td>
                         <td class="balance-col" id="newBal-${t.id}" style="font-weight:bold; color:blue; font-size:1.1em;">0</td>
+                        
+                        <td class="action-btns">
+                            <button class="btn-wa" onclick="sendWhatsApp(${t.id})" title="Send WhatsApp">📲</button>
+                            <button class="btn-del" onclick="deleteTenant(${t.id})" title="Delete Tenant">🗑️</button>
+                        </td>
                     </tr>
                 `;
             });
@@ -235,11 +292,26 @@
                     <td colspan="7" id="water-split-text" style="text-align:left; font-size: 0.9em; color: #666;">
                         *Total Motor units divided by ${tenants.length} tenants
                     </td>
+                    <td>-</td>
                 </tr>
             `;
 
             tbody.innerHTML = html;
             attachEnterKeyListener(); 
+        }
+
+        function sendWhatsApp(id) {
+            calculateAll();
+            const tenantName = document.getElementById(`name-${id}`).value;
+            const month = document.getElementById("monthSelect").value;
+            const totalDue = document.getElementById(`totalDue-${id}`).innerText;
+            const amountPaid = document.getElementById(`paid-${id}`).value || 0;
+            const newBal = document.getElementById(`newBal-${id}`).innerText;
+            
+            const message = `Hello ${tenantName},\n\nYour B-220 rent details for *${month}* have been updated.\n\n*Total Due:* ₹${totalDue}\n*Amount Paid:* ₹${amountPaid}\n*Remaining Balance:* ₹${newBal}\n\nView your full digital receipt here:\nhttps://baporalibrary.github.io/B-220-Rent-System/tenant.html\n\nThank you!`;
+            
+            const encodedMessage = encodeURIComponent(message);
+            window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
         }
 
         function attachEnterKeyListener() {
@@ -280,7 +352,6 @@
 
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
-                
                 if (isActive) {
                     const newRead = parseInt(document.getElementById(`newRead-${t.id}`).value) || t.oldReading;
                     const unitsUsed = newRead - t.oldReading;
@@ -300,19 +371,11 @@
                     document.getElementById(`totalDue-${t.id}`).innerText = totalDue;
                     document.getElementById(`newBal-${t.id}`).innerText = newBalance;
 
-                    grandUnits += unitsUsed;
-                    grandElec += elecBill;
-                    grandBase += currentBaseRent;
-                    grandExtra += extraCharges;
-                    grandPrev += t.prevPending;
-                    grandDue += totalDue;
-                    grandPaid += amountPaid;
-                    grandNewBal += newBalance;
+                    grandUnits += unitsUsed; grandElec += elecBill; grandBase += currentBaseRent; grandExtra += extraCharges;
+                    grandPrev += t.prevPending; grandDue += totalDue; grandPaid += amountPaid; grandNewBal += newBalance;
                 } else {
-                    document.getElementById(`units-${t.id}`).innerText = 0;
-                    document.getElementById(`elec-${t.id}`).innerText = 0;
-                    document.getElementById(`waterShare-${t.id}`).innerText = 0;
-                    document.getElementById(`totalDue-${t.id}`).innerText = 0;
+                    document.getElementById(`units-${t.id}`).innerText = 0; document.getElementById(`elec-${t.id}`).innerText = 0;
+                    document.getElementById(`waterShare-${t.id}`).innerText = 0; document.getElementById(`totalDue-${t.id}`).innerText = 0;
                     document.getElementById(`newBal-${t.id}`).innerText = 0;
                 }
             });
@@ -321,7 +384,6 @@
             document.getElementById("grandTotalElec").innerText = grandElec + (waterUnits * ratePerUnit);
             document.getElementById("grandTotalWater").innerText = (waterCostPerTenant * activeCount);
             document.getElementById("grandTotalBase").innerText = grandBase;
-            
             document.getElementById("grandTotalExtra").innerText = grandExtra;
             document.getElementById("grandPrevBal").innerText = grandPrev;
             document.getElementById("grandTotalDue").innerText = grandDue;
@@ -332,16 +394,12 @@
         async function saveToDatabase() {
             calculateAll();
             const selectedMonth = document.getElementById("monthSelect").value;
-            if (!selectedMonth) {
-                alert("Please select a billing month at the top!");
-                return;
-            }
+            if (!selectedMonth) { alert("Please select a billing month at the top!"); return; }
 
             document.getElementById('loading').innerText = "Sending data to Google Sheet...";
             document.getElementById('loading').style.display = 'block';
 
             let dataToSave = [];
-
             tenants.forEach(t => {
                 const isActive = document.getElementById(`active-${t.id}`).checked;
                 const newReadInput = parseInt(document.getElementById(`newRead-${t.id}`).value);
@@ -355,19 +413,10 @@
                     const thisMonthRent = elecBill + waterShare + baseRent + extraCharges;
 
                     dataToSave.push({
-                        id: t.id,
-                        name: document.getElementById(`name-${t.id}`).value,
-                        baseRent: baseRent,
-                        oldReading: t.oldReading,
-                        newReading: newReadInput,
-                        units: unitsUsed,
-                        elecBill: elecBill,
-                        waterShare: waterShare,
-                        totalRent: thisMonthRent, 
-                        month: selectedMonth,
-                        prevPending: t.prevPending,
-                        extraCharges: extraCharges,
-                        amountPaid: parseInt(document.getElementById(`paid-${t.id}`).value) || 0,
+                        id: t.id, name: document.getElementById(`name-${t.id}`).value, baseRent: baseRent,
+                        oldReading: t.oldReading, newReading: newReadInput, units: unitsUsed, elecBill: elecBill,
+                        waterShare: waterShare, totalRent: thisMonthRent, month: selectedMonth, prevPending: t.prevPending,
+                        extraCharges: extraCharges, amountPaid: parseInt(document.getElementById(`paid-${t.id}`).value) || 0,
                         newPending: parseInt(document.getElementById(`newBal-${t.id}`).innerText) || 0
                     });
                 }
@@ -390,22 +439,13 @@
             }
 
             try {
-                await fetch(API_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(dataToSave)
-                });
-                alert(`SUCCESS: Data sent for ${selectedMonth}! Please refresh your Google Sheet.`);
+                await fetch(API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(dataToSave) });
+                alert(`SUCCESS: Data sent for ${selectedMonth}!`);
                 loadHistory(); 
-            } catch (error) {
-                console.error("Save error:", error);
-                alert("Network error. Could not reach Google Sheets.");
-            }
+            } catch (error) { alert("Network error. Could not reach Google Sheets."); }
             document.getElementById('loading').style.display = 'none';
         }
 
-        // --- HISTORY POP-UP LOGIC ---
         function populateHistoryDropdown() {
             const select = document.getElementById("historyTenantSelect");
             select.innerHTML = '<option value="">-- Choose Tenant --</option>';
@@ -419,7 +459,6 @@
                 document.getElementById("historyBody").innerHTML = `<tr><td colspan="12">No history found in database yet. Save a month first!</td></tr>`;
             }
         }
-
         function closeHistoryModal() { document.getElementById("historyModal").style.display = "none"; }
         function clearMonthFilter() { document.getElementById("historyMonthFilter").value = ""; renderHistoryTable(); }
 
@@ -429,37 +468,26 @@
             const tbody = document.getElementById("historyBody");
             tbody.innerHTML = "";
 
-            if (!selectedId) {
-                tbody.innerHTML = `<tr><td colspan="12">Select a tenant to view history.</td></tr>`;
-                return;
-            }
+            if (!selectedId) { tbody.innerHTML = `<tr><td colspan="12">Select a tenant to view history.</td></tr>`; return; }
 
             let tenantRecords = fullDatabaseHistory.filter(row => row.id == selectedId);
             if (searchMonth) tenantRecords = tenantRecords.filter(row => row.month === searchMonth);
 
-            if (tenantRecords.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" style="color:red;">No historical data found for this selection.</td></tr>`;
-                return;
-            }
+            if (tenantRecords.length === 0) { tbody.innerHTML = `<tr><td colspan="12" style="color:red;">No historical data found.</td></tr>`; return; }
 
             tenantRecords.reverse().forEach(record => {
                 const totalDueCalc = (Number(record.totalRent) || 0) + (Number(record.prevPending) || 0);
                 tbody.innerHTML += `
                     <tr>
-                        <td style="font-weight:bold;">${record.month || "Unknown"}</td>
-                        <td>${record.oldReading || 0}</td>
-                        <td>${record.newReading || 0}</td>
-                        <td>${record.units || 0}</td>
-                        <td>₹${record.elecBill || 0}</td>
-                        <td>₹${record.waterShare || 0}</td>
-                        <td>₹${record.baseRent || 0}</td>
+                        <td style="font-weight:bold;">${record.month || "Unknown"}</td><td>${record.oldReading || 0}</td>
+                        <td>${record.newReading || 0}</td><td>${record.units || 0}</td><td>₹${record.elecBill || 0}</td>
+                        <td>₹${record.waterShare || 0}</td><td>₹${record.baseRent || 0}</td>
                         <td style="font-weight:bold; color:#fd7e14;">₹${record.extraCharges || 0}</td>
                         <td style="font-weight:bold; color:#d39e00;">₹${record.prevPending || 0}</td>
                         <td style="font-weight:bold; color:#c82333;">₹${totalDueCalc}</td>
                         <td style="font-weight:bold; color:#218838;">₹${record.amountPaid || 0}</td>
                         <td style="font-weight:bold; color:#0056b3;">₹${record.newPending || 0}</td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
 
