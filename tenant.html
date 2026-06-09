@@ -9,24 +9,18 @@
         .header { text-align: center; margin-bottom: 20px; color: #333; }
         .header h1 { margin: 0; font-size: 24px; color: #0056b3; }
         .header p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
-        
         .control-panel { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; margin-bottom: 20px; text-align: center; box-sizing: border-box; }
         select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; background-color: #f8f9fa; }
-        
         #loading { color: #0056b3; font-weight: bold; display: none; margin-top: 10px; }
-        
         .receipt-card { background: white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); width: 100%; max-width: 400px; padding: 20px; box-sizing: border-box; display: none; }
         .receipt-header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 15px; margin-bottom: 15px; }
         .receipt-header h2 { margin: 0; color: #333; font-size: 22px; }
         .receipt-header .month-tag { display: inline-block; background: #28a745; color: white; padding: 3px 10px; border-radius: 15px; font-size: 14px; font-weight: bold; margin-top: 5px; }
-        
         .receipt-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 15px; color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .receipt-row.sub-row { font-size: 13px; color: #888; border: none; margin-top: -8px; padding-bottom: 10px; }
-        
         .total-row { display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 2px solid #333; font-size: 18px; font-weight: bold; color: #d9534f; }
         .paid-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 18px; font-weight: bold; color: #28a745; }
         .balance-row { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 15px; border-top: 2px dashed #333; font-size: 22px; font-weight: bold; color: #0056b3; background-color: #f8f9fa; padding: 10px; border-radius: 5px; }
-        
         .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #888; }
     </style>
 </head>
@@ -40,17 +34,9 @@
     <div class="control-panel">
         <label for="tenantSelect" style="font-weight: bold; color: #333;">Select Your Room / Name:</label>
         <select id="tenantSelect" onchange="fetchTenantData()">
-            <option value="">-- Tap to Select --</option>
-            <option value="1">Room 1 - Mukesh</option>
-            <option value="2">Room 2 - Ganesh Sharma</option>
-            <option value="3">Room 3 - Sunil (Ganesh)</option>
-            <option value="4">Room 4 - Sandeep</option>
-            <option value="5">Room 5 - Vishwanath</option>
-            <option value="6">Room 6 - Vinod</option>
-            <option value="7">Room 7 - Saroj Chaupal</option>
-            <option value="8">Room 8 - Munna Mukhiya</option>
+            <option value="">-- Loading Tenants... --</option>
         </select>
-        <div id="loading">Retrieving latest bill...</div>
+        <div id="loading">Retrieving database...</div>
     </div>
 
     <div class="receipt-card" id="receiptCard">
@@ -58,105 +44,65 @@
             <h2 id="r-name">Tenant Name</h2>
             <div class="month-tag" id="r-month">Billing Month</div>
         </div>
-
-        <div class="receipt-row">
-            <span>Base Rent:</span>
-            <span style="font-weight: bold;">₹<span id="r-base">0</span></span>
-        </div>
+        <div class="receipt-row"><span>Base Rent:</span><span style="font-weight: bold;">₹<span id="r-base">0</span></span></div>
+        <div class="receipt-row"><span>Electricity Bill:</span><span style="font-weight: bold;">₹<span id="r-elec">0</span></span></div>
+        <div class="receipt-row sub-row"><span>(Old: <span id="r-old">0</span> | New: <span id="r-new">0</span> | Units: <span id="r-units">0</span>)</span></div>
+        <div class="receipt-row"><span>Water Motor Share:</span><span style="font-weight: bold;">₹<span id="r-water">0</span></span></div>
+        <div class="receipt-row"><span>Extra Charges:</span><span style="font-weight: bold; color:#fd7e14;">₹<span id="r-extra">0</span></span></div>
+        <div class="receipt-row"><span>Previous Pending Balance:</span><span style="font-weight: bold; color:#d39e00;">₹<span id="r-prev">0</span></span></div>
         
-        <div class="receipt-row">
-            <span>Electricity Bill:</span>
-            <span style="font-weight: bold;">₹<span id="r-elec">0</span></span>
-        </div>
-        <div class="receipt-row sub-row">
-            <span>(Old: <span id="r-old">0</span> | New: <span id="r-new">0</span> | Units: <span id="r-units">0</span>)</span>
-        </div>
-
-        <div class="receipt-row">
-            <span>Water Motor Share:</span>
-            <span style="font-weight: bold;">₹<span id="r-water">0</span></span>
-        </div>
-
-        <div class="receipt-row">
-            <span>Extra Charges:</span>
-            <span style="font-weight: bold; color:#fd7e14;">₹<span id="r-extra">0</span></span>
-        </div>
-
-        <div class="receipt-row">
-            <span>Previous Pending Balance:</span>
-            <span style="font-weight: bold; color:#d39e00;">₹<span id="r-prev">0</span></span>
-        </div>
-
-        <!-- NEW TOTALS SECTION -->
-        <div class="total-row">
-            <span>TOTAL DUE:</span>
-            <span>₹<span id="r-total">0</span></span>
-        </div>
-        
-        <div class="paid-row">
-            <span>AMOUNT PAID:</span>
-            <span>- ₹<span id="r-paid">0</span></span>
-        </div>
-
-        <div class="balance-row">
-            <span>REMAINING BALANCE:</span>
-            <span>₹<span id="r-newbal">0</span></span>
-        </div>
+        <div class="total-row"><span>TOTAL DUE:</span><span>₹<span id="r-total">0</span></span></div>
+        <div class="paid-row"><span>AMOUNT PAID:</span><span>- ₹<span id="r-paid">0</span></span></div>
+        <div class="balance-row"><span>REMAINING BALANCE:</span><span>₹<span id="r-newbal">0</span></span></div>
     </div>
 
-    <div class="footer">
-        Generated by B-220 Management System<br>
-        Please contact admin for any discrepancies.
-    </div>
+    <div class="footer">Generated by B-220 Management System</div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec";
         let fullDatabase = [];
 
         async function init() {
+            document.getElementById("loading").style.display = "block";
             try {
                 const response = await fetch(API_URL);
                 fullDatabase = await response.json();
+                
+                // Automatically build the dropdown based on unique names in the database
+                const select = document.getElementById("tenantSelect");
+                select.innerHTML = '<option value="">-- Tap to Select --</option>';
+                
+                let uniqueTenants = {};
+                fullDatabase.forEach(row => {
+                    if (row.id && row.id != 9) { // Ignore water motor
+                        uniqueTenants[row.id] = row.name; 
+                    }
+                });
+
+                Object.keys(uniqueTenants).forEach(id => {
+                    select.innerHTML += `<option value="${id}">${uniqueTenants[id]}</option>`;
+                });
+                
             } catch (error) {
                 console.error("Failed to load initial database", error);
+                document.getElementById("tenantSelect").innerHTML = '<option value="">Error Loading Data</option>';
             }
+            document.getElementById("loading").style.display = "none";
         }
 
         async function fetchTenantData() {
             const selectedId = document.getElementById("tenantSelect").value;
             const receiptCard = document.getElementById("receiptCard");
-            const loading = document.getElementById("loading");
 
-            if (!selectedId) {
-                receiptCard.style.display = "none";
-                return;
-            }
-
-            receiptCard.style.display = "none";
-            loading.style.display = "block";
-
-            if (fullDatabase.length === 0) {
-                try {
-                    const response = await fetch(API_URL);
-                    fullDatabase = await response.json();
-                } catch (error) {
-                    loading.innerText = "Error connecting to server.";
-                    return;
-                }
-            }
+            if (!selectedId) { receiptCard.style.display = "none"; return; }
 
             const tenantRecords = fullDatabase.filter(row => row.id == selectedId);
-            
-            if (tenantRecords.length === 0) {
-                loading.innerText = "No billing history found for this room.";
-                return;
-            }
+            if (tenantRecords.length === 0) return;
 
             const latestBill = tenantRecords[tenantRecords.length - 1];
 
             document.getElementById("r-name").innerText = latestBill.name;
             document.getElementById("r-month").innerText = "Month: " + latestBill.month;
-            
             document.getElementById("r-base").innerText = latestBill.baseRent || 0;
             document.getElementById("r-elec").innerText = latestBill.elecBill || 0;
             document.getElementById("r-old").innerText = latestBill.oldReading || 0;
@@ -168,12 +114,9 @@
 
             const totalDue = (Number(latestBill.totalRent) || 0) + (Number(latestBill.prevPending) || 0);
             document.getElementById("r-total").innerText = totalDue;
-            
-            // Inject Paid and Remaining Balance
             document.getElementById("r-paid").innerText = latestBill.amountPaid || 0;
             document.getElementById("r-newbal").innerText = latestBill.newPending || 0;
 
-            loading.style.display = "none";
             receiptCard.style.display = "block";
         }
 
