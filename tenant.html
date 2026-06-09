@@ -68,13 +68,12 @@
                 const response = await fetch(API_URL);
                 fullDatabase = await response.json();
                 
-                // Automatically build the dropdown based on unique names in the database
                 const select = document.getElementById("tenantSelect");
                 select.innerHTML = '<option value="">-- Tap to Select --</option>';
                 
                 let uniqueTenants = {};
                 fullDatabase.forEach(row => {
-                    if (row.id && row.id != 9) { // Ignore water motor
+                    if (row.id && row.id != 9) { 
                         uniqueTenants[row.id] = row.name; 
                     }
                 });
@@ -102,7 +101,15 @@
             const latestBill = tenantRecords[tenantRecords.length - 1];
 
             document.getElementById("r-name").innerText = latestBill.name;
-            document.getElementById("r-month").innerText = "Month: " + latestBill.month;
+            
+            // --- SHIELD 1: CLEAN UP THE MONTH ---
+            let cleanMonth = latestBill.month || "Unknown";
+            // If it looks like "2026-05-31T18:30...", chop it down to just "2026-05"
+            if (typeof cleanMonth === 'string' && cleanMonth.includes('T')) {
+                cleanMonth = cleanMonth.substring(0, 7); 
+            }
+            document.getElementById("r-month").innerText = "Month: " + cleanMonth;
+            
             document.getElementById("r-base").innerText = latestBill.baseRent || 0;
             document.getElementById("r-elec").innerText = latestBill.elecBill || 0;
             document.getElementById("r-old").innerText = latestBill.oldReading || 0;
@@ -110,12 +117,24 @@
             document.getElementById("r-units").innerText = latestBill.units || 0;
             document.getElementById("r-water").innerText = latestBill.waterShare || 0;
             document.getElementById("r-extra").innerText = latestBill.extraCharges || 0;
-            document.getElementById("r-prev").innerText = latestBill.prevPending || 0;
 
-            const totalDue = (Number(latestBill.totalRent) || 0) + (Number(latestBill.prevPending) || 0);
+            // --- SHIELD 2: CRUSH ANY ROGUE DATES IN MONEY COLUMNS ---
+            let safePrev = latestBill.prevPending || 0;
+            if (typeof safePrev === 'string' && safePrev.includes('T')) {
+                safePrev = 0; // Forces to 0 if a timestamp snuck in
+            }
+            document.getElementById("r-prev").innerText = safePrev;
+
+            const totalDue = (Number(latestBill.totalRent) || 0) + (Number(safePrev) || 0);
             document.getElementById("r-total").innerText = totalDue;
-            document.getElementById("r-paid").innerText = latestBill.amountPaid || 0;
-            document.getElementById("r-newbal").innerText = latestBill.newPending || 0;
+            
+            let safePaid = latestBill.amountPaid || 0;
+            if (typeof safePaid === 'string' && safePaid.includes('T')) safePaid = 0;
+            document.getElementById("r-paid").innerText = safePaid;
+            
+            let safeNewBal = latestBill.newPending || 0;
+            if (typeof safeNewBal === 'string' && safeNewBal.includes('T')) safeNewBal = 0;
+            document.getElementById("r-newbal").innerText = safeNewBal;
 
             receiptCard.style.display = "block";
         }
