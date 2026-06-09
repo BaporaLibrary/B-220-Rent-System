@@ -12,9 +12,10 @@
         table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 14px; }
         th, td { border: 1px solid #ddd; padding: 4px; text-align: center; }
         th { background-color: #ffeb3b; color: #333; font-weight: bold; }
-        input[type="number"], input[type="text"] { padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
+        input[type="number"], input[type="text"], input[type="tel"] { padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
         .read-input { width: 55px; }
         .name-input { width: 100px; }
+        .mobile-input { width: 100px; }
         .rent-input { width: 60px; font-weight: bold;}
         .highlight-row { background-color: #e9ecef; font-weight: bold; }
         .inactive-row { opacity: 0.4; background-color: #f8f9fa; }
@@ -37,7 +38,7 @@
 
         /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fff; margin: 2% auto; padding: 20px; border-radius: 8px; width: 98%; max-width: 1300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-content { background-color: #fff; margin: 2% auto; padding: 20px; border-radius: 8px; width: 98%; max-width: 1400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close-btn:hover { color: black; }
         .history-controls { margin-bottom: 15px; text-align: center; display: flex; justify-content: center; gap: 20px; align-items: center;}
@@ -64,6 +65,7 @@
                 <th>Act</th>
                 <th>Ser</th>
                 <th>Name</th>
+                <th>Mobile No</th>
                 <th>Old Read</th>
                 <th>New Read</th>
                 <th>Units</th>
@@ -83,7 +85,7 @@
         </tbody>
         <tfoot>
             <tr class="highlight-row">
-                <td colspan="5" style="text-align: right;"><strong>TOTALS:</strong></td>
+                <td colspan="6" style="text-align: right;"><strong>TOTALS:</strong></td>
                 <td id="grandTotalUnits">0</td>
                 <td id="grandTotalElec">0</td>
                 <td id="grandTotalWater">0</td>
@@ -156,17 +158,17 @@
         const ratePerUnit = 9;
         
         const defaultTenants = [
-            { id: 1, name: "Mukesh", oldReading: 3161, baseRent: 2000, prevPending: 0 },
-            { id: 2, name: "Ganesh Sharma", oldReading: 3293, baseRent: 2900, prevPending: 0 },
-            { id: 3, name: "Sunil (Ganesh)", oldReading: 10580, baseRent: 3800, prevPending: 0 },
-            { id: 4, name: "Sandeep", oldReading: 2399, baseRent: 2900, prevPending: 0 },
-            { id: 5, name: "Vishwanath", oldReading: 1299, baseRent: 2300, prevPending: 0 },
-            { id: 6, name: "Vinod", oldReading: 2879, baseRent: 2900, prevPending: 0 },
-            { id: 7, name: "Saroj Chaupal", oldReading: 3096, baseRent: 3800, prevPending: 0 },
-            { id: 8, name: "Munna Mukhiya", oldReading: 1383, baseRent: 2900, prevPending: 0 }
+            { id: 1, name: "Mukesh", mobile: "", oldReading: 3161, baseRent: 2000, prevPending: 0 },
+            { id: 2, name: "Ganesh Sharma", mobile: "", oldReading: 3293, baseRent: 2900, prevPending: 0 },
+            { id: 3, name: "Sunil (Ganesh)", mobile: "", oldReading: 10580, baseRent: 3800, prevPending: 0 },
+            { id: 4, name: "Sandeep", mobile: "", oldReading: 2399, baseRent: 2900, prevPending: 0 },
+            { id: 5, name: "Vishwanath", mobile: "", oldReading: 1299, baseRent: 2300, prevPending: 0 },
+            { id: 6, name: "Vinod", mobile: "", oldReading: 2879, baseRent: 2900, prevPending: 0 },
+            { id: 7, name: "Saroj Chaupal", mobile: "", oldReading: 3096, baseRent: 3800, prevPending: 0 },
+            { id: 8, name: "Munna Mukhiya", mobile: "", oldReading: 1383, baseRent: 2900, prevPending: 0 }
         ];
 
-        // LOAD FROM LOCAL MEMORY (OR USE DEFAULTS IF FIRST TIME)
+        // LOAD FROM LOCAL MEMORY
         let tenants = JSON.parse(localStorage.getItem('b220_tenants_list')) || defaultTenants;
 
         let waterMotor = { oldReading: 4648, newReading: 4845 };
@@ -195,11 +197,13 @@
                             t.name = lastRecord.name; 
                             t.baseRent = lastRecord.baseRent; 
                             t.prevPending = lastRecord.newPending || 0; 
+                            // Only pull mobile from history if memory is blank, to prevent overwriting new entries
+                            if(!t.mobile && lastRecord.mobile) t.mobile = lastRecord.mobile;
                         }
                     });
-                    saveMemory(); // Update memory with fresh names/rents
+                    saveMemory(); 
 
-                    const waterHistory = historyData.filter(row => row.id == 9); // Motor is always ID 9
+                    const waterHistory = historyData.filter(row => row.id == 9);
                     if (waterHistory.length > 0) {
                         const lastWater = waterHistory[waterHistory.length - 1];
                         waterMotor.oldReading = lastWater.newReading;
@@ -213,25 +217,24 @@
             populateHistoryDropdown();
         }
 
-        // --- DYNAMIC TENANT FUNCTIONS ---
         function addNewTenant() {
             const newName = prompt("Enter the new tenant's name (e.g. Room 9 - Rahul):");
             if (!newName) return;
             const newRent = parseInt(prompt("Enter their Base Rent amount:")) || 0;
+            const newMobile = prompt("Enter their WhatsApp Mobile Number:") || "";
             
-            // Find highest ID to create a new one. (Skip 9 to protect water motor)
             let maxId = tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) : 0;
             let nextId = maxId + 1;
             if (nextId === 9) nextId = 10; 
 
-            tenants.push({ id: nextId, name: newName, oldReading: 0, baseRent: newRent, prevPending: 0 });
+            tenants.push({ id: nextId, name: newName, mobile: newMobile, oldReading: 0, baseRent: newRent, prevPending: 0 });
             saveMemory();
             renderTable();
             populateHistoryDropdown();
         }
 
         function deleteTenant(id) {
-            if(confirm("Are you sure you want to remove this tenant from the dashboard? (Their past history will still remain safely in the database).")) {
+            if(confirm("Are you sure you want to remove this tenant from the dashboard?")) {
                 tenants = tenants.filter(t => t.id !== id);
                 saveMemory();
                 renderTable();
@@ -244,6 +247,7 @@
             const t = tenants.find(t => t.id === id);
             if(t) {
                 t.name = document.getElementById(`name-${id}`).value;
+                t.mobile = document.getElementById(`mobile-${id}`).value;
                 t.baseRent = parseInt(document.getElementById(`baseRent-${id}`).value) || 0;
                 saveMemory();
             }
@@ -259,6 +263,7 @@
                         <td><input type="checkbox" id="active-${t.id}" checked onchange="calculateAll()"></td>
                         <td>${t.id}</td>
                         <td><input type="text" id="name-${t.id}" value="${t.name}" class="name-input" onchange="updateLocalData(${t.id})"></td>
+                        <td><input type="tel" id="mobile-${t.id}" value="${t.mobile || ''}" class="mobile-input" placeholder="98765..." onchange="updateLocalData(${t.id})"></td>
                         <td id="oldRead-${t.id}">${t.oldReading}</td>
                         <td><input type="number" id="newRead-${t.id}" placeholder="Enter" class="read-input calc-trigger"></td>
                         <td id="units-${t.id}">0</td>
@@ -273,7 +278,7 @@
                         <td class="balance-col" id="newBal-${t.id}" style="font-weight:bold; color:blue; font-size:1.1em;">0</td>
                         
                         <td class="action-btns">
-                            <button class="btn-wa" onclick="sendWhatsApp(${t.id})" title="Send WhatsApp">📲</button>
+                            <button class="btn-wa" onclick="sendWhatsApp(${t.id})" title="Send Direct WhatsApp">📲</button>
                             <button class="btn-del" onclick="deleteTenant(${t.id})" title="Delete Tenant">🗑️</button>
                         </td>
                     </tr>
@@ -285,6 +290,7 @@
                     <td>-</td>
                     <td>9</td>
                     <td>Water Motor</td>
+                    <td>-</td>
                     <td id="oldRead-water">${waterMotor.oldReading}</td>
                     <td><input type="number" id="newRead-water" placeholder="Enter" class="read-input calc-trigger"></td>
                     <td id="units-water">0</td>
@@ -300,8 +306,24 @@
             attachEnterKeyListener(); 
         }
 
+        // --- DIRECT WHATSAPP SENDER ---
         function sendWhatsApp(id) {
             calculateAll();
+            
+            // Get clean mobile number (strip spaces and dashes)
+            let rawMobile = document.getElementById(`mobile-${id}`).value;
+            let cleanMobile = rawMobile.replace(/[^0-9]/g, '');
+            
+            if(!cleanMobile) {
+                alert("Please enter a mobile number for this tenant first!");
+                return;
+            }
+
+            // Automatically add +91 (India) if they only entered 10 digits
+            if(cleanMobile.length === 10) {
+                cleanMobile = "91" + cleanMobile;
+            }
+
             const tenantName = document.getElementById(`name-${id}`).value;
             const month = document.getElementById("monthSelect").value;
             const totalDue = document.getElementById(`totalDue-${id}`).innerText;
@@ -311,7 +333,9 @@
             const message = `Hello ${tenantName},\n\nYour B-220 rent details for *${month}* have been updated.\n\n*Total Due:* ₹${totalDue}\n*Amount Paid:* ₹${amountPaid}\n*Remaining Balance:* ₹${newBal}\n\nView your full digital receipt here:\nhttps://baporalibrary.github.io/B-220-Rent-System/tenant.html\n\nThank you!`;
             
             const encodedMessage = encodeURIComponent(message);
-            window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+            
+            // Open direct chat
+            window.open(`https://wa.me/${cleanMobile}?text=${encodedMessage}`, '_blank');
         }
 
         function attachEnterKeyListener() {
@@ -413,7 +437,10 @@
                     const thisMonthRent = elecBill + waterShare + baseRent + extraCharges;
 
                     dataToSave.push({
-                        id: t.id, name: document.getElementById(`name-${t.id}`).value, baseRent: baseRent,
+                        id: t.id, 
+                        name: document.getElementById(`name-${t.id}`).value, 
+                        mobile: document.getElementById(`mobile-${t.id}`).value, // Sent to DB backup
+                        baseRent: baseRent,
                         oldReading: t.oldReading, newReading: newReadInput, units: unitsUsed, elecBill: elecBill,
                         waterShare: waterShare, totalRent: thisMonthRent, month: selectedMonth, prevPending: t.prevPending,
                         extraCharges: extraCharges, amountPaid: parseInt(document.getElementById(`paid-${t.id}`).value) || 0,
@@ -425,7 +452,7 @@
             const waterNewReadInput = parseInt(document.getElementById(`newRead-water`).value);
             if(waterNewReadInput > 0) {
                 dataToSave.push({
-                    id: 9, name: "Water Motor", baseRent: 0, oldReading: waterMotor.oldReading, newReading: waterNewReadInput,
+                    id: 9, name: "Water Motor", mobile: "", baseRent: 0, oldReading: waterMotor.oldReading, newReading: waterNewReadInput,
                     units: document.getElementById(`units-water`).innerText, elecBill: document.getElementById(`elec-water`).innerText,
                     waterShare: 0, totalRent: document.getElementById(`elec-water`).innerText, month: selectedMonth,
                     prevPending: 0, extraCharges: 0, amountPaid: 0, newPending: 0
