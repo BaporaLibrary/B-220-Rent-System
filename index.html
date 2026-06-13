@@ -6,6 +6,18 @@
     <title>B 220 Rent Record - Admin Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        
+        /* --- SECURITY LOGIN SHIELD --- */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #343a40; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; width: 100%; max-width: 320px; }
+        .login-box h2 { color: #007bff; margin-top: 0; margin-bottom: 5px; }
+        .login-box p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        .login-box input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+        .btn-login { background-color: #28a745; color: white; padding: 12px; width: 100%; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-login:hover { background-color: #218838; }
+        #loginError { color: red; font-size: 14px; display: none; margin-top: 15px; font-weight: bold; }
+        /* ----------------------------- */
+
         .header-controls { display: flex; justify-content: space-between; align-items: center; background-color: #007bff; color: white; padding: 15px; border-radius: 5px 5px 0 0; flex-wrap: wrap; gap: 10px;}
         .header-controls h2 { margin: 0; }
         .month-selector { padding: 5px; font-size: 16px; }
@@ -36,7 +48,6 @@
         #loading { text-align: center; color: #007bff; font-weight: bold; margin: 10px; display: none; }
         input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
 
-        /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fff; margin: 2% auto; padding: 20px; border-radius: 8px; width: 98%; max-width: 1400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
@@ -48,6 +59,18 @@
     </style>
 </head>
 <body>
+
+    <!-- SECURITY LOCK SCREEN -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>B-220 Admin</h2>
+            <p>Authorized Personnel Only</p>
+            <input type="email" id="adminEmail" placeholder="Email Address" onkeypress="handleLoginEnter(event)">
+            <input type="password" id="adminPassword" placeholder="Password" onkeypress="handleLoginEnter(event)">
+            <button class="btn-login" onclick="checkLogin()">Login to Dashboard</button>
+            <p id="loginError">Access Denied. Incorrect credentials.</p>
+        </div>
+    </div>
 
     <div class="header-controls">
         <h2>B 220 RENT RECORD (Admin View)</h2>
@@ -154,7 +177,26 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbz8WoekX005UOxIpnEE4xwiolYLQ6Cx9CGXwog5F5NAAeovKtrjDRoUwnBsdpiBYWpd/exec"; 
+        // --- LOGIN AUTHENTICATION LOGIC ---
+        function checkLogin() {
+            const email = document.getElementById('adminEmail').value.trim();
+            const pass = document.getElementById('adminPassword').value.trim();
+            
+            // UPDATED LOGIN CREDENTIALS
+            if (email === 'maheshbapora9393@gmail.com' && pass === '221476@Koku') {
+                document.getElementById('login-overlay').style.display = 'none';
+                loadHistory(); // Only load the database AFTER they prove who they are
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        function handleLoginEnter(e) {
+            if (e.key === 'Enter') { checkLogin(); }
+        }
+        // ----------------------------------
+
+        const API_URL = "https://script.google.com/macros/s/AKfycbyz33X7_igtKrvQPl87jPzI3keKOqEgYN6k7bl4YMlHcWN68FuqEh2Wta98wmtkZfHb/exec"; 
         const ratePerUnit = 9;
         
         const defaultTenants = [
@@ -168,9 +210,7 @@
             { id: 8, name: "Munna Mukhiya", mobile: "", oldReading: 1383, baseRent: 2900, prevPending: 0 }
         ];
 
-        // LOAD FROM LOCAL MEMORY
         let tenants = JSON.parse(localStorage.getItem('b220_tenants_list')) || defaultTenants;
-
         let waterMotor = { oldReading: 4648, newReading: 4845 };
         let fullDatabaseHistory = []; 
 
@@ -196,8 +236,11 @@
                             t.oldReading = lastRecord.newReading; 
                             t.name = lastRecord.name; 
                             t.baseRent = lastRecord.baseRent; 
-                            t.prevPending = lastRecord.newPending || 0; 
-                            // Only pull mobile from history if memory is blank, to prevent overwriting new entries
+                            
+                            let safeNewPending = lastRecord.newPending || 0;
+                            if (typeof safeNewPending === 'string' && safeNewPending.includes('T')) safeNewPending = 0;
+                            t.prevPending = safeNewPending; 
+                            
                             if(!t.mobile && lastRecord.mobile) t.mobile = lastRecord.mobile;
                         }
                     });
@@ -228,18 +271,13 @@
             if (nextId === 9) nextId = 10; 
 
             tenants.push({ id: nextId, name: newName, mobile: newMobile, oldReading: 0, baseRent: newRent, prevPending: 0 });
-            saveMemory();
-            renderTable();
-            populateHistoryDropdown();
+            saveMemory(); renderTable(); populateHistoryDropdown();
         }
 
         function deleteTenant(id) {
             if(confirm("Are you sure you want to remove this tenant from the dashboard?")) {
                 tenants = tenants.filter(t => t.id !== id);
-                saveMemory();
-                renderTable();
-                calculateAll();
-                populateHistoryDropdown();
+                saveMemory(); renderTable(); calculateAll(); populateHistoryDropdown();
             }
         }
 
@@ -287,14 +325,10 @@
 
             html += `
                 <tr style="background-color: #d1ecf1; font-weight: bold;">
-                    <td>-</td>
-                    <td>9</td>
-                    <td>Water Motor</td>
-                    <td>-</td>
+                    <td>-</td><td>9</td><td>Water Motor</td><td>-</td>
                     <td id="oldRead-water">${waterMotor.oldReading}</td>
                     <td><input type="number" id="newRead-water" placeholder="Enter" class="read-input calc-trigger"></td>
-                    <td id="units-water">0</td>
-                    <td id="elec-water">0</td>
+                    <td id="units-water">0</td><td id="elec-water">0</td>
                     <td colspan="7" id="water-split-text" style="text-align:left; font-size: 0.9em; color: #666;">
                         *Total Motor units divided by ${tenants.length} tenants
                     </td>
@@ -306,23 +340,12 @@
             attachEnterKeyListener(); 
         }
 
-        // --- DIRECT WHATSAPP SENDER ---
         function sendWhatsApp(id) {
             calculateAll();
-            
-            // Get clean mobile number (strip spaces and dashes)
             let rawMobile = document.getElementById(`mobile-${id}`).value;
             let cleanMobile = rawMobile.replace(/[^0-9]/g, '');
-            
-            if(!cleanMobile) {
-                alert("Please enter a mobile number for this tenant first!");
-                return;
-            }
-
-            // Automatically add +91 (India) if they only entered 10 digits
-            if(cleanMobile.length === 10) {
-                cleanMobile = "91" + cleanMobile;
-            }
+            if(!cleanMobile) { alert("Please enter a mobile number for this tenant first!"); return; }
+            if(cleanMobile.length === 10) cleanMobile = "91" + cleanMobile;
 
             const tenantName = document.getElementById(`name-${id}`).value;
             const month = document.getElementById("monthSelect").value;
@@ -331,11 +354,7 @@
             const newBal = document.getElementById(`newBal-${id}`).innerText;
             
             const message = `Hello ${tenantName},\n\nYour B-220 rent details for *${month}* have been updated.\n\n*Total Due:* ₹${totalDue}\n*Amount Paid:* ₹${amountPaid}\n*Remaining Balance:* ₹${newBal}\n\nView your full digital receipt here:\nhttps://baporalibrary.github.io/B-220-Rent-System/tenant.html\n\nThank you!`;
-            
-            const encodedMessage = encodeURIComponent(message);
-            
-            // Open direct chat
-            window.open(`https://wa.me/${cleanMobile}?text=${encodedMessage}`, '_blank');
+            window.open(`https://wa.me/${cleanMobile}?text=${encodeURIComponent(message)}`, '_blank');
         }
 
         function attachEnterKeyListener() {
@@ -437,11 +456,8 @@
                     const thisMonthRent = elecBill + waterShare + baseRent + extraCharges;
 
                     dataToSave.push({
-                        id: t.id, 
-                        name: document.getElementById(`name-${t.id}`).value, 
-                        mobile: document.getElementById(`mobile-${t.id}`).value, // Sent to DB backup
-                        baseRent: baseRent,
-                        oldReading: t.oldReading, newReading: newReadInput, units: unitsUsed, elecBill: elecBill,
+                        id: t.id, name: document.getElementById(`name-${t.id}`).value, mobile: document.getElementById(`mobile-${t.id}`).value, 
+                        baseRent: baseRent, oldReading: t.oldReading, newReading: newReadInput, units: unitsUsed, elecBill: elecBill,
                         waterShare: waterShare, totalRent: thisMonthRent, month: selectedMonth, prevPending: t.prevPending,
                         extraCharges: extraCharges, amountPaid: parseInt(document.getElementById(`paid-${t.id}`).value) || 0,
                         newPending: parseInt(document.getElementById(`newBal-${t.id}`).innerText) || 0
@@ -461,8 +477,7 @@
 
             if(dataToSave.length === 0) {
                 alert("Error: You must type a number into the 'New Reading' boxes before saving!");
-                document.getElementById('loading').style.display = 'none';
-                return;
+                document.getElementById('loading').style.display = 'none'; return;
             }
 
             try {
@@ -503,22 +518,40 @@
             if (tenantRecords.length === 0) { tbody.innerHTML = `<tr><td colspan="12" style="color:red;">No historical data found.</td></tr>`; return; }
 
             tenantRecords.reverse().forEach(record => {
-                const totalDueCalc = (Number(record.totalRent) || 0) + (Number(record.prevPending) || 0);
+                let safeMonth = record.month || "Unknown";
+                if (typeof safeMonth === 'string' && safeMonth.includes('T')) safeMonth = safeMonth.substring(0, 7);
+
+                let safePrev = record.prevPending || 0;
+                if (typeof safePrev === 'string' && safePrev.includes('T')) safePrev = 0;
+
+                let safeExtra = record.extraCharges || 0;
+                if (typeof safeExtra === 'string' && safeExtra.includes('T')) safeExtra = 0;
+
+                let safePaid = record.amountPaid || 0;
+                if (typeof safePaid === 'string' && safePaid.includes('T')) safePaid = 0;
+
+                let safeNew = record.newPending || 0;
+                if (typeof safeNew === 'string' && safeNew.includes('T')) safeNew = 0;
+
+                const totalDueCalc = (Number(record.totalRent) || 0) + (Number(safePrev) || 0);
+                
                 tbody.innerHTML += `
                     <tr>
-                        <td style="font-weight:bold;">${record.month || "Unknown"}</td><td>${record.oldReading || 0}</td>
-                        <td>${record.newReading || 0}</td><td>${record.units || 0}</td><td>₹${record.elecBill || 0}</td>
-                        <td>₹${record.waterShare || 0}</td><td>₹${record.baseRent || 0}</td>
-                        <td style="font-weight:bold; color:#fd7e14;">₹${record.extraCharges || 0}</td>
-                        <td style="font-weight:bold; color:#d39e00;">₹${record.prevPending || 0}</td>
+                        <td style="font-weight:bold;">${safeMonth}</td>
+                        <td>${record.oldReading || 0}</td>
+                        <td>${record.newReading || 0}</td>
+                        <td>${record.units || 0}</td>
+                        <td>₹${record.elecBill || 0}</td>
+                        <td>₹${record.waterShare || 0}</td>
+                        <td>₹${record.baseRent || 0}</td>
+                        <td style="font-weight:bold; color:#fd7e14;">₹${safeExtra}</td>
+                        <td style="font-weight:bold; color:#d39e00;">₹${safePrev}</td>
                         <td style="font-weight:bold; color:#c82333;">₹${totalDueCalc}</td>
-                        <td style="font-weight:bold; color:#218838;">₹${record.amountPaid || 0}</td>
-                        <td style="font-weight:bold; color:#0056b3;">₹${record.newPending || 0}</td>
+                        <td style="font-weight:bold; color:#218838;">₹${safePaid}</td>
+                        <td style="font-weight:bold; color:#0056b3;">₹${safeNew}</td>
                     </tr>`;
             });
         }
-
-        window.onload = loadHistory;
     </script>
 </body>
 </html>
